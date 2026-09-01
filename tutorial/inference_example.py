@@ -3,6 +3,15 @@ Complete inference file for InferKit - serves checkpoint from train_example.py
 Run: inferkit serve tutorial/inference_example.py --port 8001
 Test: curl.exe -X POST http://localhost:8001/api/v1/infer/json -H "Content-Type: application/json" -d "{\"features\":[5.1,3.5,1.4,0.2]}"
 Docs: http://localhost:8001/docs
+
+Customization (in code):
+  from inferkit.server import create_app
+  app = create_app(title="My Iris Service", enable_multipart=False, enable_stream=False, enable_ws=False)
+  # then only POST /api/v1/infer/json remains in Swagger
+Customization (via .env - easier):
+  INFERKIT_APP_NAME=My Iris Service
+  INFERKIT_ENABLE_MULTIPART=false
+  INFERKIT_ENABLE_STREAM=false
 """
 import asyncio
 import io
@@ -63,3 +72,16 @@ async def run_stream(payload):
     for tok in text.split():
         yield tok + " "
         await asyncio.sleep(0.02)
+
+
+# --- Code customization (optional) ---
+# Uncomment to set custom Swagger title and hide extra APIs directly in code.
+# This overrides .env and is picked up automatically by `inferkit serve`.
+# from inferkit.server import create_app
+# app = create_app(
+#     title="My Iris Service",
+#     enable_multipart=False,  # hide POST /api/v1/infer
+#     enable_stream=False,     # hide POST /api/v1/infer/stream
+#     enable_ws=False,         # hide WS /ws/infer
+#     # enable_json=True,      # keep only json
+# )

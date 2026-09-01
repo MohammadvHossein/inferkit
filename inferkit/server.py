@@ -291,6 +291,7 @@ def serve(entry_file: str | None = None, host: str | None = None, port: int | No
 
     import uvicorn
 
+    custom_app = None
     if entry_file:
         p = pathlib.Path(entry_file).resolve()
         if str(p.parent) not in sys.path:
@@ -299,8 +300,13 @@ def serve(entry_file: str | None = None, host: str | None = None, port: int | No
         if spec and spec.loader:
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)  # type: ignore
+            if hasattr(mod, "app") and isinstance(getattr(mod, "app"), FastAPI):
+                custom_app = getattr(mod, "app")
 
     if not has_run():
         raise RuntimeError("No @infer function found. Decorate your function with @infer")
 
-    uvicorn.run("inferkit.server:create_app", factory=True, host=host or settings.host, port=port or settings.port, reload=reload)
+    if custom_app is not None:
+        uvicorn.run(custom_app, host=host or settings.host, port=port or settings.port)
+    else:
+        uvicorn.run("inferkit.server:create_app", factory=True, host=host or settings.host, port=port or settings.port, reload=reload)
