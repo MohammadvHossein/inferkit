@@ -9,5 +9,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e .[dev]
-      - run: pytest -q
+      - run: pytest --cov --cov-report=term-missing -q
       - run: ruff check inferkit
+      - run: mypy inferkit --ignore-missing-imports

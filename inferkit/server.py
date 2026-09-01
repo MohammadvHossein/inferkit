@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import (
@@ -30,9 +32,25 @@ async def verify_api_key(x_api_key: str | None = Header(default=None)):
     if settings.api_key and x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if has_run():
+        try:
+            fn = get_run()
+            if fn and hasattr(fn, "preload"):
+                result = fn.preload()  # type: ignore
+                if asyncio.iscoroutine(result):
+                    await result
+                logger.info("model preload done")
+            else:
+                logger.info("model ready (lazy load on first request)")
+        except Exception as e:
+            logger.warning(f"preload failed: {e}")
+    yield
+
 def create_app() -> FastAPI:
     setup_logging(logging.INFO if not settings.debug else logging.DEBUG)
-    app = FastAPI(title=settings.app_name, debug=settings.debug)
+    app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
     app.state.limiter = limiter
     app.add_middleware(GZipMiddleware, minimum_size=500)
     app.add_middleware(LoggingMiddleware)

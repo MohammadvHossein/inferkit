@@ -1,0 +1,7 @@
+site_name: InferKit
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Vision: vision.md
+  - API: api.md
