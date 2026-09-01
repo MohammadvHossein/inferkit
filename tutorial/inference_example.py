@@ -1,19 +1,25 @@
 """
-Complete inference file for InferKit - serves checkpoint from train_example
-Run: inferkit dev tutorial/inference_example.py
-Test: curl -X POST http://localhost:8000/api/v1/infer/json -d '{"features":[5.1,3.5,1.4,0.2]}' -H "Content-Type: application/json"
+Complete inference file for InferKit - serves checkpoint from train_example.py
+Run: inferkit serve tutorial/inference_example.py --port 8001
+Test: curl.exe -X POST http://localhost:8001/api/v1/infer/json -H "Content-Type: application/json" -d "{\"features\":[5.1,3.5,1.4,0.2]}"
+Docs: http://localhost:8001/docs
 """
-from pathlib import Path
-import pickle
-import io
 import asyncio
-from PIL import Image
-from inferkit import infer, image_to_base64
+import io
+import pickle
+from pathlib import Path
+
+from inferkit import image_to_base64, infer
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None  # type: ignore
 
 MODEL_PATH = Path("checkpoints/model.pkl")
 TARGET_PATH = Path("checkpoints/target_names.pkl")
 
-if MODEL_PATH.exists():
+if MODEL_PATH.exists() and TARGET_PATH.exists():
     with open(MODEL_PATH, "rb") as f:
         clf = pickle.load(f)
     with open(TARGET_PATH, "rb") as f:
@@ -28,16 +34,23 @@ else:
 @infer
 async def run(payload, files=None):
     if files:
+        if Image is None:
+            return {"error": "Pillow not installed. Install with: pip install inferkit[vision]"}
         img = Image.open(io.BytesIO(files[0]))
         return {"output": f"image {img.size}", "has_file": True}
     if clf is not None and "features" in payload:
         feats = payload["features"]
-        if len(feats) != 4:
-            return {"error": "features must be 4 numbers"}
-        pred = clf.predict([feats])[0]
-        proba = clf.predict_proba([feats])[0].max()
+        if not isinstance(feats, list) or len(feats) != 4:
+            return {"error": "features must be a list of 4 numbers"}
+        try:
+            pred = clf.predict([feats])[0]
+            proba = clf.predict_proba([feats])[0].max()
+        except Exception as e:
+            return {"error": str(e)}
         return {"prediction": int(pred), "label": str(target_names[pred]), "confidence": float(proba)}
     if payload.get("mode") == "image_out":
+        if Image is None:
+            return {"error": "Pillow not installed. Install with: pip install inferkit[vision]"}
         img = Image.new("RGB", (256, 256), "blue")
         return image_to_base64(img)
     text = payload.get("text", "")
