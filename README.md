@@ -72,8 +72,24 @@ INFERKIT_DEBUG=false
 # plain HOST/PORT/CORS_ORIGINS also work for backwards compat
 ```
 
+## Tutorial (0 to 100)
+
+Complete guide with training and checkpoint: [`tutorial/00-100-complete-guide.md`](tutorial/00-100-complete-guide.md)
+
+```bash
+python tutorial/train_example.py      # train and save checkpoints/model.pkl
+inferkit dev tutorial/inference_example.py  # serve
+```
+
 ## Programmatic
 ```python
 from inferkit import serve
 serve("my_model.py", port=8000)
 ```
+
+## Documentation
+
+- `docs/index.md` - Usage
+- `docs/api.md` - API Reference
+- `docs/vision.md` - Vision example
+- `docs/tutorial.md` - Tutorial index

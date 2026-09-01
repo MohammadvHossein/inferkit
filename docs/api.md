@@ -4,23 +4,23 @@
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/` | - | خوش‌آمد + `has_model` |
-| `GET` | `/health` | - | سلامت |
+| `GET` | `/` | - | Welcome + `has_model` |
+| `GET` | `/health` | - | Health check |
 | `GET` | `/metrics` | - | `{"requests": int, "model_loaded": bool}` |
-| `GET` | `/api/v1/info` | - | اطلاعات مدل |
-| `POST` | `/api/v1/infer` | `X-API-Key` اگر ست باشد | `multipart/form-data`: `payload` (JSON string) + `files` (چند فایل). محدودیت `413` |
-| `POST` | `/api/v1/infer/json` | `X-API-Key` | `application/json` بدنه JSON. محدودیت `1MB` |
+| `GET` | `/api/v1/info` | - | Model info |
+| `POST` | `/api/v1/infer` | `X-API-Key` if set | `multipart/form-data`: `payload` (JSON string) + `files` (multiple files). Limit `413` |
+| `POST` | `/api/v1/infer/json` | `X-API-Key` | `application/json` body. Limit `1MB` |
 | `POST` | `/api/v1/infer/stream` | `X-API-Key` | SSE `text/event-stream`: `data: {"token": ...}` + `data: [DONE]` |
-| `WS` | `/ws/infer` | `X-API-Key` header یا `?api_key=` | WebSocket: ارسال `{"text":"hi"}` یا `{"text":"hi","stream":true}`، دریافت `{"output":...}` یا `{"token":...}` + `{"done":true}` |
-| `WS` | `/api/v1/ws/infer` | همان | Alias برای WS |
+| `WS` | `/ws/infer` | `X-API-Key` header or `?api_key=` | WebSocket: send `{"text":"hi"}` or `{"text":"hi","stream":true}`, receive `{"output":...}` or `{"token":...}` + `{"done":true}` |
+| `WS` | `/api/v1/ws/infer` | same | Alias for WS |
 
-## مثال curl
+## curl Examples
 
 ```bash
 # JSON
 curl -X POST http://localhost:8000/api/v1/infer/json -H "Content-Type: application/json" -d '{"text":"hello"}'
 
-# فایل
+# File
 curl -X POST http://localhost:8000/api/v1/infer -F payload='{"text":"hi"}' -F files=@cat.jpg
 
 # SSE
@@ -32,15 +32,15 @@ wscat -c ws://localhost:8000/ws/infer
 < {"token":"hello "}
 ```
 
-## خطاها
-- `400` JSON نامعتبر یا `payload` غیر-object
-- `401` API key اشتباه
-- `413` حجم payload/فایل بیش از حد
-- `429` Rate limit (`60/minute` پیش‌فرض)
-- `500` مدل ثبت نشده یا خطای inference (در `DEBUG=false` پیام عمومی)
+## Errors
+- `400` Invalid JSON or `payload` not an object
+- `401` Invalid API key
+- `413` Payload/file too large
+- `429` Rate limit (`60/minute` default)
+- `500` No model registered or inference error (generic message when `DEBUG=false`)
 
 ## Rate Limit
-هدر `X-API-Key` + `slowapi` با `INFERKIT_RATE_LIMIT`. پاسخ `429 {"error":"rate limit exceeded"}`
+Uses `slowapi` with `INFERKIT_RATE_LIMIT`. Response `429 {"error":"rate limit exceeded"}`
 
 ## CORS
-`INFERKIT_CORS_ORIGINS=["*"]` → `allow_credentials=False` (خودکار). برای دامنه خاص: `["http://a.com"]` → `allow_credentials=True`
+`INFERKIT_CORS_ORIGINS=["*"]` -> `allow_credentials=False` (automatic). For specific domain: `["http://a.com"]` -> `allow_credentials=True`
