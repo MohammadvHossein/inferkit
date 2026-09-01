@@ -259,8 +259,10 @@ Notes:
 ```bash
 # method 1: CLI (recommended)
 inferkit dev inference.py --port 8000
-# or
-inferkit serve inference.py --port 8000
+# or custom port if 8000 is busy:
+inferkit dev inference.py --port 8001
+# or via env:
+INFERKIT_PORT=8001 inferkit dev inference.py
 
 # method 2: programmatic
 # python -c "from inferkit import serve; serve('inference.py', port=8000)"
@@ -269,6 +271,33 @@ inferkit serve inference.py --port 8000
 # http://localhost:8000/docs
 # http://localhost:8000/health
 # http://localhost:8000/metrics
+```
+
+### 7.0 Port Already in Use / Firewall (Windows)
+
+If `curl http://localhost:8000/health` returns `Not Found` and `netstat -ano | findstr :8000` shows two listeners:
+
+```powershell
+# find and kill old process
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# or just use another port
+inferkit dev inference.py --port 8001
+```
+
+Allow port in Windows Firewall:
+
+```powershell
+New-NetFirewallRule -DisplayName "InferKit 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "InferKit 8001" -Direction Inbound -LocalPort 8001 -Protocol TCP -Action Allow
+```
+
+On Linux:
+
+```bash
+sudo ufw allow 8000/tcp
+sudo ufw allow 8001/tcp
 ```
 
 ### 7.1 Test with curl
@@ -296,7 +325,19 @@ curl -N -X POST http://localhost:8000/api/v1/infer/stream \
 # data: [DONE]
 ```
 
-### 7.2 Test with Python
+### 7.2 Test with Swagger UI
+
+Your Swagger shows 7 endpoints. Test directly in browser at `http://localhost:8000/docs`:
+
+- `GET /health` -> Try it out -> Execute -> should return `{"status":"ok"}`
+- `GET /metrics` -> `{"requests":..., "model_loaded": true}`
+- `GET /api/v1/info` -> `{"has_model": true}`
+- `POST /api/v1/infer/json` -> Try it out -> body `{"text":"hello"}` or `{"features":[5.1,3.5,1.4,0.2]}` -> Execute
+- `POST /api/v1/infer` -> use `payload` + `files` (multipart)
+- `POST /api/v1/infer/stream` -> body `{"text":"hello world"}` -> streaming response
+- `GET /` -> Welcome message
+
+### 7.3 Test with Python
 
 ```python
 import httpx

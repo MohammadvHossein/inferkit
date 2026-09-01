@@ -106,3 +106,33 @@ pip install inferkit[transformers]  # transformers+accelerate
 pip install inferkit[all]           # all extras
 pip install inferkit[dev]           # pytest, ruff, mypy
 ```
+
+## Port and Firewall
+
+If port 8000 is busy (`Not Found` or `Address already in use`):
+
+```bash
+inferkit dev inference.py --port 8001
+# or
+INFERKIT_PORT=8001 inferkit dev inference.py
+```
+
+Windows Firewall:
+
+```powershell
+New-NetFirewallRule -DisplayName "InferKit 8001" -Direction Inbound -LocalPort 8001 -Protocol TCP -Action Allow
+```
+
+Linux:
+
+```bash
+sudo ufw allow 8001/tcp
+```
+
+## Testing via Swagger
+
+Open `http://localhost:8000/docs`:
+
+- `GET /health` -> Try it out -> Execute -> `{"status":"ok"}`
+- `POST /api/v1/infer/json` -> body `{"features":[5.1,3.5,1.4,0.2]}` -> Execute
+- `POST /api/v1/infer/stream` -> `{"text":"hello world"}` for SSE
