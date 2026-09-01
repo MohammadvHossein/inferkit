@@ -151,6 +151,7 @@ def test_cors_credentials_false_when_wildcard():
 def test_metrics_and_helpers():
     load_example()
     reset_limiter()
+    pytest.importorskip("PIL")
     from inferkit import image_to_base64
     from PIL import Image
 

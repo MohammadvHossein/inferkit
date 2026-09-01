@@ -5,7 +5,11 @@ import importlib.util
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None  # type: ignore
 
 from inferkit.registry import set_run, set_stream
 from inferkit.server import create_app
@@ -34,6 +38,8 @@ def test_infer_json_text(client):
     assert "output" in r.json()
 
 def test_infer_json_image_out(client):
+    if Image is None:
+        pytest.skip("Pillow not installed")
     r = client.post("/api/v1/infer/json", json={"mode": "image_out"})
     assert r.status_code == 200
     data = r.json()
