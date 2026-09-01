@@ -258,11 +258,11 @@ Notes:
 
 ```bash
 # method 1: CLI (recommended)
-inferkit dev inference.py --port 8000
+inferkit serve inference.py --port 8000
 # or custom port if 8000 is busy:
-inferkit dev inference.py --port 8001
+inferkit serve inference.py --port 8001
 # or via env:
-INFERKIT_PORT=8001 inferkit dev inference.py
+INFERKIT_PORT=8001 inferkit serve inference.py
 
 # method 2: programmatic
 # python -c "from inferkit import serve; serve('inference.py', port=8000)"
@@ -283,7 +283,7 @@ netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 
 # or just use another port
-inferkit dev inference.py --port 8001
+inferkit serve inference.py --port 8001
 ```
 
 Allow port in Windows Firewall:
@@ -474,7 +474,7 @@ INFERKIT_DEBUG=false
 
 **Error `PIL not found`?** `pip install inferkit[vision]` or `Pillow`.
 
-**Port already in use?** `INFERKIT_PORT=9000 inferkit dev inference.py`
+**Port already in use?** `INFERKIT_PORT=9000 inferkit serve inference.py`
 
 ---
 
@@ -485,7 +485,7 @@ git clone https://github.com/MohammadvHossein/inferkit
 cd inferkit
 pip install -e ".[dev,vision]"
 python tutorial/train_example.py
-inferkit dev tutorial/inference_example.py
+inferkit serve tutorial/inference_example.py
 ```
 
 Open an issue if needed: `https://github.com/MohammadvHossein/inferkit/issues`

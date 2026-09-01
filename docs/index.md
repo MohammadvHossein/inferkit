@@ -112,9 +112,9 @@ pip install inferkit[dev]           # pytest, ruff, mypy
 If port 8000 is busy (`Not Found` or `Address already in use`):
 
 ```bash
-inferkit dev inference.py --port 8001
+inferkit serve inference.py --port 8001
 # or
-INFERKIT_PORT=8001 inferkit dev inference.py
+INFERKIT_PORT=8001 inferkit serve inference.py
 ```
 
 Windows Firewall:

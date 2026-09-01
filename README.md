@@ -28,8 +28,8 @@ async def run_stream(payload):
 
 Run:
 ```bash
-inferkit dev my_model.py --port 8000
-# docs at http://localhost:8000/docs
+inferkit serve my_model.py --port 8001
+# docs at http://localhost:8001/docs
 ```
 
 Endpoints auto created:
@@ -78,7 +78,7 @@ Complete guide with training and checkpoint: [`tutorial/00-100-complete-guide.md
 
 ```bash
 python tutorial/train_example.py      # train and save checkpoints/model.pkl
-inferkit dev tutorial/inference_example.py  # serve
+inferkit serve tutorial/inference_example.py --port 8001  # serve
 ```
 
 ## Programmatic

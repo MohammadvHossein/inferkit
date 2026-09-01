@@ -45,7 +45,7 @@ def cmd_init(args):
             encoding="utf-8",
         )
         print("created my_model.py")
-    print("init done. Edit my_model.py and run: inferkit dev my_model.py")
+    print("init done. Edit my_model.py and run: inferkit serve my_model.py --port 8001")
 
 
 def bump_version(part: str = "patch"):
@@ -102,12 +102,6 @@ def load_entry(entry: str):
     mod = importlib.util.module_from_spec(spec)  # type: ignore
     spec.loader.exec_module(mod)  # type: ignore
     return mod
-
-
-def cmd_dev(args):
-    from .server import serve
-
-    serve(entry_file=args.entry, host=args.host, port=args.port, reload=True)
 
 
 def cmd_serve(args):
@@ -167,12 +161,7 @@ def main():
     p_bump.add_argument("part", nargs="?", default="patch", choices=["patch", "minor", "major"])
     p_bump.add_argument("--push", action="store_true", help="commit and push tag")
     p_bump.set_defaults(func=cmd_bump)
-    p_dev = sub.add_parser("dev", help="dev server with reload")
-    p_dev.add_argument("entry", help="path to my_model.py")
-    p_dev.add_argument("--host", default=None)
-    p_dev.add_argument("--port", type=int, default=None)
-    p_dev.set_defaults(func=cmd_dev)
-    p_serve = sub.add_parser("serve", help="prod server")
+    p_serve = sub.add_parser("serve", help="serve model")
     p_serve.add_argument("entry", help="path to my_model.py")
     p_serve.add_argument("--host", default=None)
     p_serve.add_argument("--port", type=int, default=None)
