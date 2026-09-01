@@ -4,9 +4,10 @@ Library for ML / Vision / LLM / Agent. No FastAPI boilerplate needed.
 
 ## Install
 ```bash
-pip install inferkit
-# local dev
-pip install -e .
+pip install inferkit              # core (no Pillow)
+pip install inferkit[vision]      # + Pillow for image in/out
+pip install inferkit[torch,transformers]  # heavy ML stacks
+pip install -e .[dev]             # local dev
 ```
 
 ## Usage - 3 lines
@@ -35,32 +36,40 @@ Endpoints auto created:
 - `POST /api/v1/infer` (multipart file + json)
 - `POST /api/v1/infer/json` (json only)
 - `POST /api/v1/infer/stream` (SSE)
-- `WS /ws/infer` (WebSocket + streaming + image base64)
+- `WS /ws/infer` and `WS /api/v1/ws/infer` (WebSocket + streaming)
 
-Image output: `return {"image_base64": b64, "media_type": "image/png"}` or `return png_bytes`
+Image output helpers:
+```python
+from inferkit import image_to_base64, bytes_to_response
+from PIL import Image
+return image_to_base64(Image.new("RGB",(512,512),"red"))
+return bytes_to_response(png_bytes, "image/png")
+# also still supported: return {"image_base64": b64} or return png_bytes
+```
 
 ## Init new project
 ```bash
 inferkit init
-# creates .env.example, Dockerfile
+# creates .env.example, .env, Dockerfile, my_model.py
 ```
 
 ## Deploy (one command, any OS, auto detects Docker)
 ```bash
 inferkit deploy
 # if docker available -> docker compose/build
-# else -> venv + uvicorn --workers 4 on 0.0.0.0:8000
+# else -> venv + uvicorn on INFERKIT_HOST:INFERKIT_PORT
 ```
 
 ## Config via .env
 ```
-HOST=0.0.0.0
-PORT=8000
-CORS_ORIGINS=["*"]
-MAX_UPLOAD_MB=50
-RATE_LIMIT=60/minute
-API_KEY=  # if set, require X-API-Key header
-DEBUG=false
+INFERKIT_HOST=0.0.0.0
+INFERKIT_PORT=8000
+INFERKIT_CORS_ORIGINS=["*"]   # or * or http://a.com,http://b.com
+INFERKIT_MAX_UPLOAD_MB=50
+INFERKIT_RATE_LIMIT=60/minute
+INFERKIT_API_KEY=            # if set, require X-API-Key header (also ?api_key=)
+INFERKIT_DEBUG=false
+# plain HOST/PORT/CORS_ORIGINS also work for backwards compat
 ```
 
 ## Programmatic

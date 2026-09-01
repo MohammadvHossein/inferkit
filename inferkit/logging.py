@@ -1,35 +1,53 @@
 import logging
 import sys
 import time
-from collections.abc import Callable
 
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
+logger = logging.getLogger("inferkit")
+request_count: int = 0
+_logging_setup_done = False
 
 
 def setup_logging(level: int = logging.INFO) -> None:
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
+    global _logging_setup_done
+    if _logging_setup_done:
+        logger.setLevel(level)
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
+    logger.handlers.clear()
+    logger.addHandler(handler)
+    logger.setLevel(level)
+    logger.propagate = False
+    _logging_setup_done = True
 
 
-logger = logging.getLogger("inferkit")
+class LoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
 
-
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
         start = time.time()
+        path = scope.get("path", "")
+        method = scope.get("method", "WS")
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                duration = (time.time() - start) * 1000
+                headers = list(message.get("headers", []))
+                headers.append((b"x-response-time", f"{duration:.1f}ms".encode()))
+                message["headers"] = headers
+                logger.info(f"{method} {path} {message['status']} {duration:.1f}ms")
+                global request_count
+                request_count += 1
+            await send(message)
+
         try:
-            response = await call_next(request)
-            duration = (time.time() - start) * 1000
-            logger.info(f"{request.method} {request.url.path} {response.status_code} {duration:.1f}ms")
-            response.headers["X-Response-Time"] = f"{duration:.1f}ms"
-            return response
+            await self.app(scope, receive, send_wrapper)
         except Exception as e:
-            logger.exception(f"Error {request.url.path}: {e}")
+            if e.__class__.__name__ in ("WebSocketDisconnect", "Disconnect"):
+                raise
+            logger.exception(f"Error {path}: {e}")
             raise
-
-
-request_count = 0

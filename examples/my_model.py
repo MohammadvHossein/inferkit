@@ -1,7 +1,6 @@
-from inferkit import infer
-import base64
-import io
+from inferkit import image_to_base64, infer
 from PIL import Image
+
 
 @infer
 async def run(payload, files=None):
@@ -13,17 +12,24 @@ async def run(payload, files=None):
 
     if mode == "image_out":
         img = Image.new("RGB", (256, 256), color="blue")
+        return image_to_base64(img)
+
+    if mode == "bytes_out":
+        img = Image.new("RGB", (64, 64), color="red")
+        import io
+
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
-        return {"image_base64": b64, "media_type": "image/png"}
+        return buf.getvalue()
 
     return {"output": f"echo: {text}"}
 
+
 @infer.stream
 async def run_stream(payload):
+    import asyncio
+
     text = payload.get("text", "hello streaming")
     for tok in text.split():
         yield tok + " "
-        import asyncio
         await asyncio.sleep(0.03)

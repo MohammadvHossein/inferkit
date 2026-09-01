@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 from collections.abc import Callable
 from typing import Any
@@ -6,22 +5,28 @@ from typing import Any
 _run_fn: Callable | None = None
 _stream_fn: Callable | None = None
 
+
 def set_run(fn: Callable):
     global _run_fn
     _run_fn = fn
+
 
 def set_stream(fn: Callable):
     global _stream_fn
     _stream_fn = fn
 
+
 def get_run() -> Callable | None:
     return _run_fn
+
 
 def get_stream() -> Callable | None:
     return _stream_fn
 
+
 def has_run() -> bool:
     return _run_fn is not None
+
 
 async def call_run(payload: dict[str, Any], files: list[bytes] | None = None) -> Any:
     fn = get_run()
@@ -34,14 +39,17 @@ async def call_run(payload: dict[str, Any], files: list[bytes] | None = None) ->
     elif len(sig.parameters) >= 1:
         first = list(sig.parameters.keys())[0]
         kwargs[first] = payload
+    else:
+        raise TypeError("Registered @infer function must accept at least one argument (payload)")
     if "files" in sig.parameters:
         kwargs["files"] = files
-    result = fn(**kwargs) if kwargs else fn(payload)
-    if inspect.isawaitable(result) or inspect.iscoroutine(result):
-        result = await result
-    if asyncio.iscoroutine(result):
+    elif files:
+        raise TypeError("Function does not accept 'files' but files were uploaded. Add 'files=None' param")
+    result = fn(**kwargs)
+    if inspect.isawaitable(result):
         result = await result
     return result
+
 
 async def call_stream(payload: dict[str, Any]):
     sfn = get_stream()
