@@ -1,6 +1,6 @@
 [project]
 name = "inferkit"
-version = "0.1.1"
+version = "0.1.2"
 description = "Dynamic AI inference kit - deploy any ML/Vision/LLM function with one command"
 readme = "README.md"
 requires-python = ">=3.11"
