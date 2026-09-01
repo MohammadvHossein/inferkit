@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 
+
 def cmd_init(args):
     base = pathlib.Path.cwd()
     env_ex = base / ".env.example"

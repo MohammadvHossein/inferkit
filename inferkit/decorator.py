@@ -1,6 +1,7 @@
-from collections.abc import AsyncGenerator
-from typing import Any, Callable
+from collections.abc import Callable
+
 from .registry import set_run, set_stream
+
 
 def infer(func: Callable) -> Callable:
     set_run(func)

@@ -1,9 +1,19 @@
-import base64
 import json
 import logging
 from typing import Any
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -149,6 +159,7 @@ def create_app() -> FastAPI:
 def serve(entry_file: str | None = None, host: str | None = None, port: int | None = None, reload: bool = False):
     import importlib.util
     import pathlib
+
     import uvicorn
 
     if entry_file:

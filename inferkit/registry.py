@@ -1,7 +1,7 @@
 import asyncio
 import inspect
-from collections.abc import AsyncGenerator
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _run_fn: Callable | None = None
 _stream_fn: Callable | None = None
@@ -37,9 +37,7 @@ async def call_run(payload: dict[str, Any], files: list[bytes] | None = None) ->
     if "files" in sig.parameters:
         kwargs["files"] = files
     result = fn(**kwargs) if kwargs else fn(payload)
-    if inspect.isawaitable(result):
-        result = await result
-    elif inspect.iscoroutine(result):
+    if inspect.isawaitable(result) or inspect.iscoroutine(result):
         result = await result
     if asyncio.iscoroutine(result):
         result = await result
