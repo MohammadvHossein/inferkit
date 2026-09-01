@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
@@ -10,7 +11,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from .config import settings
-from .registry import get_run, get_stream, has_run
+from .logging import LoggingMiddleware, logger, setup_logging
+from .registry import call_run, call_stream, get_run, get_stream, has_run
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -19,9 +21,11 @@ async def verify_api_key(x_api_key: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 def create_app() -> FastAPI:
+    setup_logging(logging.INFO if not settings.debug else logging.DEBUG)
     app = FastAPI(title=settings.app_name, debug=settings.debug)
     app.state.limiter = limiter
     app.add_middleware(GZipMiddleware, minimum_size=500)
+    app.add_middleware(LoggingMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -37,6 +41,10 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    @app.get("/metrics")
+    def metrics():
+        return {"requests": "ok", "model_loaded": has_run()}
 
     @app.get(f"{settings.api_prefix}/info")
     def info():
@@ -60,12 +68,12 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": "Invalid JSON in payload"}, status_code=400)
         check_size(files)
         fb = [await f.read() for f in files] if files else None
-        fn = get_run()
-        if not fn:
+        if not has_run():
             return JSONResponse({"error": "No model registered. Use @infer"}, status_code=500)
         try:
-            result = await fn(data, fb) if fb is not None else await fn(data)
+            result = await call_run(data, fb)
         except Exception as e:
+            logger.exception("infer failed")
             return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
         if isinstance(result, dict) and "image_base64" in result:
             return result
@@ -76,12 +84,12 @@ def create_app() -> FastAPI:
     @app.post(f"{settings.api_prefix}/infer/json", dependencies=[Depends(verify_api_key)])
     @limiter.limit(settings.rate_limit)
     async def infer_json(request: Request, payload: dict[str, Any]):
-        fn = get_run()
-        if not fn:
+        if not has_run():
             return JSONResponse({"error": "No model registered"}, status_code=500)
         try:
-            result = await fn(payload)
+            result = await call_run(payload)
         except Exception as e:
+            logger.exception("infer_json failed")
             return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
         if isinstance(result, dict) and "image_base64" in result:
             return result
@@ -94,14 +102,13 @@ def create_app() -> FastAPI:
     async def infer_stream(request: Request, payload: dict[str, Any]):
         sfn = get_stream()
         if not sfn:
-            fn = get_run()
             async def single():
-                r = await fn(payload)  # type: ignore
+                r = await call_run(payload)
                 yield f"data: {json.dumps(r)}\n\n"
                 yield "data: [DONE]\n\n"
             return StreamingResponse(single(), media_type="text/event-stream")
         async def gen():
-            async for chunk in sfn(payload):
+            async for chunk in call_stream(payload):
                 yield f"data: {json.dumps({'token': chunk})}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(gen(), media_type="text/event-stream")
@@ -110,7 +117,6 @@ def create_app() -> FastAPI:
     @app.websocket(f"{settings.api_prefix}/ws/infer")
     async def ws_infer(ws: WebSocket):
         await ws.accept()
-        fn = get_run()
         sfn = get_stream()
         try:
             while True:
@@ -120,15 +126,15 @@ def create_app() -> FastAPI:
                 except Exception:
                     data = {"text": msg}
                 if isinstance(data, dict) and data.get("stream") and sfn:
-                    async for chunk in sfn(data):
+                    async for chunk in call_stream(data):
                         await ws.send_text(json.dumps({"token": chunk}))
                     await ws.send_text(json.dumps({"done": True}))
                     continue
-                if not fn:
+                if not has_run():
                     await ws.send_text(json.dumps({"error": "No model"}))
                     continue
                 try:
-                    result = await fn(data)
+                    result = await call_run(data)
                     if isinstance(result, bytes):
                         await ws.send_bytes(result)
                     else:
