@@ -67,3 +67,31 @@ def test_file_upload(client):
     r = client.post("/api/v1/infer", data={"payload": '{"text":"hi"}'}, files={"files": ("test.jpg", buf, "image/jpeg")})
     assert r.status_code == 200
     assert r.json()["output"].startswith("received")
+
+def test_root_and_info(client):
+    assert client.get("/").status_code == 200
+    assert client.get("/api/v1/info").status_code == 200
+    assert client.get("/metrics").status_code == 200
+
+def test_invalid_json(client):
+    r = client.post("/api/v1/infer", data={"payload": "not-json"}, files={})
+    assert r.status_code == 400
+
+def test_bytes_return():
+    from inferkit import infer
+
+    @infer
+    async def bytes_run(payload, files=None):
+        return b"\x89PNG"
+
+    app = create_app()
+    c = TestClient(app)
+    r = c.post("/api/v1/infer/json", json={"text": "hi"})
+    assert r.content.startswith(b"\x89PNG")
+    load_example()
+
+def test_websocket(client):
+    with client.websocket_connect("/ws/infer") as ws:
+        ws.send_text('{"text":"hello"}')
+        data = ws.receive_text()
+        assert "output" in data
