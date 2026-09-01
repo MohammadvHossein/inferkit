@@ -73,9 +73,22 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_app() -> FastAPI:
+def create_app(
+    title: str | None = None,
+    enable_multipart: bool | None = None,
+    enable_json: bool | None = None,
+    enable_stream: bool | None = None,
+    enable_ws: bool | None = None,
+) -> FastAPI:
+    app_title = title or settings.app_name
+    em = settings.enable_multipart if enable_multipart is None else enable_multipart
+    ej = settings.enable_json if enable_json is None else enable_json
+    es = settings.enable_stream if enable_stream is None else enable_stream
+    ew = settings.enable_ws if enable_ws is None else enable_ws
+    if es and not has_run() and not get_stream():
+        pass
     setup_logging(logging.INFO if not settings.debug else logging.DEBUG)
-    app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+    app = FastAPI(title=app_title, debug=settings.debug, lifespan=lifespan)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)  # type: ignore[arg-type]
 
@@ -92,7 +105,7 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def root():
-        return {"message": f"Welcome to {settings.app_name}", "docs": "/docs", "has_model": has_run()}
+        return {"message": f"Welcome to {app_title}", "docs": "/docs", "has_model": has_run()}
 
     @app.get("/health")
     def health():
@@ -144,116 +157,129 @@ def create_app() -> FastAPI:
             return Response(content=result["data"], media_type=result["media_type"])
         return result
 
-    @app.post(f"{settings.api_prefix}/infer", dependencies=[Depends(verify_api_key)])
-    @limiter.limit(settings.rate_limit)
-    async def infer(request: Request, payload: str = Form(default="{}"), files: list[UploadFile] | None = File(default=None)):
-        try:
-            data: dict[str, Any] = json.loads(payload) if payload else {}
-        except Exception:
-            return JSONResponse({"error": "Invalid JSON in payload"}, status_code=400)
-        if not isinstance(data, dict):
-            return JSONResponse({"error": "payload must be a JSON object"}, status_code=400)
-        if len(payload) > 1 * 1024 * 1024:
-            return JSONResponse({"error": "payload too large (max 1MB)"}, status_code=413)
-        check_file_types(files)
-        fb = [await f.read() for f in files] if files else None
-        check_size(request, files, fb)
-        if not has_run():
-            return JSONResponse({"error": "No model registered. Use @infer"}, status_code=500)
-        try:
-            result = await call_run(data, fb)
-        except TypeError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-        except Exception as e:
-            logger.exception("infer failed")
-            return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
-        if isinstance(result, dict) and result.get("media_type") and "image_base64" in result:
-            return result
-        return _format_result(result)
+    if em:
 
-    @app.post(f"{settings.api_prefix}/infer/json", dependencies=[Depends(verify_api_key)])
-    @limiter.limit(settings.rate_limit)
-    async def infer_json(request: Request, payload: dict[str, Any]):
-        body_size = len(json.dumps(payload, default=str).encode())
-        if body_size > 1 * 1024 * 1024:
-            return JSONResponse({"error": "payload too large (max 1MB)"}, status_code=413)
-        if not has_run():
-            return JSONResponse({"error": "No model registered"}, status_code=500)
-        try:
-            result = await call_run(payload)
-        except TypeError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-        except Exception as e:
-            logger.exception("infer_json failed")
-            return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
-        return _format_result(result)
-
-    @app.post(f"{settings.api_prefix}/infer/stream", dependencies=[Depends(verify_api_key)])
-    @limiter.limit(settings.rate_limit)
-    async def infer_stream(request: Request, payload: dict[str, Any]):
-        body_size = len(json.dumps(payload, default=str).encode())
-        if body_size > 1 * 1024 * 1024:
-            return JSONResponse({"error": "payload too large"}, status_code=413)
-        sfn = get_stream()
-        if not sfn:
+        @app.post(f"{settings.api_prefix}/infer", dependencies=[Depends(verify_api_key)], include_in_schema=True)
+        @limiter.limit(settings.rate_limit)
+        async def infer(request: Request, payload: str = Form(default="{}"), files: list[UploadFile] | None = File(default=None)):
             try:
-                r = await call_run(payload)
+                data: dict[str, Any] = json.loads(payload) if payload else {}
+            except Exception:
+                return JSONResponse({"error": "Invalid JSON in payload"}, status_code=400)
+            if not isinstance(data, dict):
+                return JSONResponse({"error": "payload must be a JSON object"}, status_code=400)
+            if len(payload) > 1 * 1024 * 1024:
+                return JSONResponse({"error": "payload too large (max 1MB)"}, status_code=413)
+            check_file_types(files)
+            fb = [await f.read() for f in files] if files else None
+            check_size(request, files, fb)
+            if not has_run():
+                return JSONResponse({"error": "No model registered. Use @infer"}, status_code=500)
+            try:
+                result = await call_run(data, fb)
+            except TypeError as e:
+                return JSONResponse({"error": str(e)}, status_code=400)
             except Exception as e:
-                logger.exception("infer_stream fallback failed")
+                logger.exception("infer failed")
                 return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
+            if isinstance(result, dict) and result.get("media_type") and "image_base64" in result:
+                return result
+            return _format_result(result)
 
-            async def single():
-                yield f"data: {json.dumps(r, default=str)}\n\n"
-                yield "data: [DONE]\n\n"
+    if ej:
 
-            return StreamingResponse(single(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-        else:
+        @app.post(f"{settings.api_prefix}/infer/json", dependencies=[Depends(verify_api_key)], include_in_schema=True)
+        @limiter.limit(settings.rate_limit)
+        async def infer_json(request: Request, payload: dict[str, Any]):
+            body_size = len(json.dumps(payload, default=str).encode())
+            if body_size > 1 * 1024 * 1024:
+                return JSONResponse({"error": "payload too large (max 1MB)"}, status_code=413)
+            if not has_run():
+                return JSONResponse({"error": "No model registered"}, status_code=500)
+            try:
+                result = await call_run(payload)
+            except TypeError as e:
+                return JSONResponse({"error": str(e)}, status_code=400)
+            except Exception as e:
+                logger.exception("infer_json failed")
+                return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
+            return _format_result(result)
 
-            async def gen():
-                async for chunk in call_stream(payload):
-                    yield f"data: {json.dumps({'token': chunk}, default=str)}\n\n"
-                yield "data: [DONE]\n\n"
+    if es:
+        show_stream = get_stream() is not None
 
-            return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-    async def _ws_handler(ws: WebSocket):
-        await verify_api_key_ws(ws)
-        await ws.accept()
-        sfn = get_stream()
-        try:
-            while True:
-                msg = await ws.receive_text()
-                if len(msg) > 1 * 1024 * 1024:
-                    await ws.send_text(json.dumps({"error": "message too large"}))
-                    continue
+        @app.post(
+            f"{settings.api_prefix}/infer/stream",
+            dependencies=[Depends(verify_api_key)],
+            include_in_schema=show_stream,
+        )
+        @limiter.limit(settings.rate_limit)
+        async def infer_stream(request: Request, payload: dict[str, Any]):
+            body_size = len(json.dumps(payload, default=str).encode())
+            if body_size > 1 * 1024 * 1024:
+                return JSONResponse({"error": "payload too large"}, status_code=413)
+            sfn = get_stream()
+            if not sfn:
                 try:
-                    data = json.loads(msg)
-                except Exception:
-                    data = {"text": msg}
-                if isinstance(data, dict) and data.get("stream") and sfn:
+                    r = await call_run(payload)
+                except Exception as e:
+                    logger.exception("infer_stream fallback failed")
+                    return JSONResponse({"error": "inference failed" if not settings.debug else str(e)}, status_code=500)
+
+                async def single():
+                    yield f"data: {json.dumps(r, default=str)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+                return StreamingResponse(single(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            else:
+
+                async def gen():
+                    async for chunk in call_stream(payload):
+                        yield f"data: {json.dumps({'token': chunk}, default=str)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+                return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    if ew:
+
+        async def _ws_handler(ws: WebSocket):
+            await verify_api_key_ws(ws)
+            await ws.accept()
+            sfn = get_stream()
+            try:
+                while True:
+                    msg = await ws.receive_text()
+                    if len(msg) > 1 * 1024 * 1024:
+                        await ws.send_text(json.dumps({"error": "message too large"}))
+                        continue
                     try:
-                        async for chunk in call_stream(data):
-                            await ws.send_text(json.dumps({"token": chunk}, default=str))
-                        await ws.send_text(json.dumps({"done": True}))
+                        data = json.loads(msg)
+                    except Exception:
+                        data = {"text": msg}
+                    if isinstance(data, dict) and data.get("stream") and sfn:
+                        try:
+                            async for chunk in call_stream(data):
+                                await ws.send_text(json.dumps({"token": chunk}, default=str))
+                            await ws.send_text(json.dumps({"done": True}))
+                        except Exception as e:
+                            await ws.send_text(json.dumps({"error": "inference failed" if not settings.debug else str(e)}))
+                        continue
+                    if not has_run():
+                        await ws.send_text(json.dumps({"error": "No model"}))
+                        continue
+                    try:
+                        result = await call_run(data if isinstance(data, dict) else {"text": data})
+                        if isinstance(result, bytes):
+                            await ws.send_bytes(result)
+                        else:
+                            await ws.send_text(json.dumps(result, default=str))
                     except Exception as e:
                         await ws.send_text(json.dumps({"error": "inference failed" if not settings.debug else str(e)}))
-                    continue
-                if not has_run():
-                    await ws.send_text(json.dumps({"error": "No model"}))
-                    continue
-                try:
-                    result = await call_run(data if isinstance(data, dict) else {"text": data})
-                    if isinstance(result, bytes):
-                        await ws.send_bytes(result)
-                    else:
-                        await ws.send_text(json.dumps(result, default=str))
-                except Exception as e:
-                    await ws.send_text(json.dumps({"error": "inference failed" if not settings.debug else str(e)}))
-        except WebSocketDisconnect:
-            pass
+            except WebSocketDisconnect:
+                pass
 
-    app.add_api_websocket_route("/ws/infer", _ws_handler)
-    app.add_api_websocket_route(f"{settings.api_prefix}/ws/infer", _ws_handler)
+        app.add_api_websocket_route("/ws/infer", _ws_handler)
+        app.add_api_websocket_route(f"{settings.api_prefix}/ws/infer", _ws_handler)
 
     return app
 

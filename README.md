@@ -62,6 +62,7 @@ inferkit deploy
 
 ## Config via .env
 ```
+INFERKIT_APP_NAME=InferKit   # Swagger title - custom service name
 INFERKIT_HOST=0.0.0.0
 INFERKIT_PORT=8000
 INFERKIT_CORS_ORIGINS=["*"]   # or * or http://a.com,http://b.com
@@ -69,7 +70,37 @@ INFERKIT_MAX_UPLOAD_MB=50
 INFERKIT_RATE_LIMIT=60/minute
 INFERKIT_API_KEY=            # if set, require X-API-Key header (also ?api_key=)
 INFERKIT_DEBUG=false
+# API pruning per project (set false to hide from Swagger):
+INFERKIT_ENABLE_MULTIPART=true
+INFERKIT_ENABLE_JSON=true
+INFERKIT_ENABLE_STREAM=true
+INFERKIT_ENABLE_WS=true
 # plain HOST/PORT/CORS_ORIGINS also work for backwards compat
+```
+
+## Customization
+
+**Service name (easiest):**
+```bash
+# .env
+INFERKIT_APP_NAME=MyService
+```
+```python
+# code (overrides .env)
+from inferkit.server import create_app
+app = create_app(title="MyService")
+```
+
+**Prune APIs per project:**
+```bash
+# only JSON, hide multipart/stream/WS
+INFERKIT_ENABLE_MULTIPART=false
+INFERKIT_ENABLE_STREAM=false
+INFERKIT_ENABLE_WS=false
+```
+```python
+app = create_app(enable_multipart=False, enable_stream=False, enable_ws=False)
+# stream is auto-hidden if no @infer.stream is defined
 ```
 
 ## Tutorial (0 to 100)

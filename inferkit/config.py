@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     rate_limit: str = Field(default="60/minute", validation_alias=AliasChoices("INFERKIT_RATE_LIMIT", "RATE_LIMIT"))
     debug: bool = Field(default=False, validation_alias=AliasChoices("INFERKIT_DEBUG", "DEBUG"))
     api_key: str | None = Field(default=None, validation_alias=AliasChoices("INFERKIT_API_KEY", "API_KEY"))
+    enable_multipart: bool = Field(default=True, validation_alias=AliasChoices("INFERKIT_ENABLE_MULTIPART", "ENABLE_MULTIPART"))
+    enable_json: bool = Field(default=True, validation_alias=AliasChoices("INFERKIT_ENABLE_JSON", "ENABLE_JSON"))
+    enable_stream: bool = Field(default=True, validation_alias=AliasChoices("INFERKIT_ENABLE_STREAM", "ENABLE_STREAM"))
+    enable_ws: bool = Field(default=True, validation_alias=AliasChoices("INFERKIT_ENABLE_WS", "ENABLE_WS"))
 
     model_config = SettingsConfigDict(
         env_file=".env",
